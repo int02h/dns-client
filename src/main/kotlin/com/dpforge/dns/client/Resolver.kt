@@ -33,6 +33,9 @@ class Resolver {
             }
         }
         val answerMessage = MessageDecoder().decode(answer)
+        if (answerMessage.responseCode != Message.ResponseCode.NO_ERROR) {
+            return emptyList()
+        }
         if (answerMessage.answers.isNotEmpty()) {
             return answerMessage.answers
         } else {
