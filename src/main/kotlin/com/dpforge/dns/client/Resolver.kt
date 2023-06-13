@@ -21,15 +21,16 @@ class Resolver {
     }
 
     private fun resolveWith(message: ByteArray, serverAddress: InetAddress): List<ResourceRecord> {
-        val clientSocket = Socket(serverAddress, 53)
         val answer: ByteArray
-        clientSocket.getOutputStream().use { output ->
-            clientSocket.getInputStream().use { input ->
-                output.write(message)
-                output.flush()
-                val size = input.read().shl(8) + input.read()
-                answer = ByteArray(size)
-                input.read(answer)
+        Socket(serverAddress, 53).use { clientSocket ->
+            clientSocket.getOutputStream().use { output ->
+                clientSocket.getInputStream().use { input ->
+                    output.write(message)
+                    output.flush()
+                    val size = input.read().shl(8) + input.read()
+                    answer = ByteArray(size)
+                    input.read(answer)
+                }
             }
         }
         val answerMessage = MessageDecoder().decode(answer)
