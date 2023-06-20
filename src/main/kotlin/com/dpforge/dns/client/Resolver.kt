@@ -8,6 +8,7 @@ import com.dpforge.dns.client.message.ResourceRecord
 import com.dpforge.dns.client.util.ByteArrayBuilder
 import java.net.InetAddress
 import java.net.Socket
+import kotlin.random.Random
 
 /**
  * https://datatracker.ietf.org/doc/html/rfc1035
@@ -20,12 +21,12 @@ class Resolver {
         return resolveWith(message, InetAddress.getByName(rootServer.ipAddressV4))
     }
 
-    private fun resolveWith(message: ByteArray, serverAddress: InetAddress): List<ResourceRecord> {
+    private fun resolveWith(message: EncodedMessage, serverAddress: InetAddress): List<ResourceRecord> {
         val answer: ByteArray
         Socket(serverAddress, 53).use { clientSocket ->
             clientSocket.getOutputStream().use { output ->
                 clientSocket.getInputStream().use { input ->
-                    output.write(message)
+                    output.write(message.encodedData)
                     output.flush()
                     val size = input.read().shl(8) + input.read()
                     answer = ByteArray(size)
@@ -34,7 +35,10 @@ class Resolver {
             }
         }
         val answerMessage = MessageDecoder().decode(answer)
-        if (answerMessage.responseCode != Message.ResponseCode.NO_ERROR) {
+        if (
+            answerMessage.id != message.originalMessage.id ||
+            answerMessage.responseCode != Message.ResponseCode.NO_ERROR
+        ) {
             return emptyList()
         }
         if (answerMessage.answers.isNotEmpty()) {
@@ -64,9 +68,9 @@ class Resolver {
         }
     }
 
-    private fun buildMessage(args: Arguments): ByteArray {
+    private fun buildMessage(args: Arguments): EncodedMessage {
         val message = Message(
-            id = 12354,
+            id = Random.nextInt(Short.MAX_VALUE.toInt()).toShort(),
             qr = Message.QR.QUERY,
             opcode = Message.Opcode.STANDARD_QUERY,
             questions = listOf(
@@ -78,8 +82,17 @@ class Resolver {
             )
         )
         val data = MessageEncoder().encode(message)
-        return ByteArrayBuilder().addShort(data.size).addBytes(data).toByteArray()
+        val tcpData = ByteArrayBuilder().addShort(data.size).addBytes(data).toByteArray()
+        return EncodedMessage(
+            originalMessage = message,
+            encodedData = tcpData
+        )
     }
+
+    private class EncodedMessage(
+        val originalMessage: Message,
+        val encodedData: ByteArray
+    )
 
     class RootServer(val ipAddressV4: String, val hostname: String)
 
